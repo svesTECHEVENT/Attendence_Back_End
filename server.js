@@ -17,7 +17,7 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 3002;
 
 const options = {
-  origin: 'https://attendence-front-end.vercel.app',
+  origin: 'https://attendence-front-end.vercel.app/',
   credentials: true,
   methods: ["GET", "POST"],
   transports: ['websocket', 'polling']
@@ -261,7 +261,7 @@ console.log(user);
       console.error(error);
     }
   });
-
+s
   socket.on("initailStudentData",async({name,mail,section})=>{
     const foundSection = await Attendance.findOne({ section });
     if (foundSection) {
