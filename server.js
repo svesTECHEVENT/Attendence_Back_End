@@ -24,7 +24,7 @@ const io = socketIo(server,{
 });
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/');
+mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/', { useNewUrlParser: true, useUnifiedTopology: true });
 
 // Use bodyParser middleware to parse JSON
 app.use(bodyParser.json());
