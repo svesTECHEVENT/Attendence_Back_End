@@ -1,8 +1,8 @@
-const nodemailer = require("nodemailer")
+const nodemailer = require("nodemailer");
 const AttendenceAdmin = require('./models/admin');
 const StudentModel = require('./models/student');
-const OTP=require('./models/otp')
-const Attendance=require('./models/Attendence')
+const OTP = require('./models/otp');
+const Attendance = require('./models/Attendence');
 const express = require('express');
 const mongoose = require('mongoose');
 const bodyParser = require('body-parser');
@@ -12,89 +12,68 @@ const socketIo = require('socket.io');
 
 const app = express();
 const server = http.createServer(app);
-const io = socketIo(server);
-
-const PORT = process.env.PORT || 3002;
-
-const options = {
-  origin: "*",
-  credentials: true,
-  methods: ["GET", "POST"],
-  transports: ['websocket', 'polling']
-}
-
-app.use(cors(options));
-app.use(bodyParser.json());
-
-// Connect to MongoDB
-mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/',{ useNewUrlParser: true, useUnifiedTopology: true });
-
-
-// Use bodyParser middleware to parse JSON
-app.use(bodyParser.json());
-
-io.on('connection', (socket) => {
-  console.log('A user connected');
-  
-
-   
-socket.on('LoginAdmin', async (message) => {
-  try {
-      // Find the user based on the entered mail and password
-      const user = await AttendenceAdmin.findOne({ mail: message.enteredMail, password: message.enteredPassword });
-  console.log(user);
-      if (user) {
-        // Send success message to the client
-        io.emit("LoginStatus",JSON.stringify({ status:true,userData:user }));
-      console.log(user)
-      } else {
-        io.emit("LoginStatus",JSON.stringify({ status:false }));
-      }
-    
-    // Other types of requests can be handled similarly
-
-  } catch (error) {
-    // Handle error
-    console.error(error);
+const io = socketIo(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true,
+    transports: ['websocket', 'polling']
   }
 });
 
-socket.on('LoginStudent',async(message)=>{
-  try {
-    // Find the user based on the entered mail and password
-    const user = await StudentModel.findOne({ mail: message.enteredMail, password: message.enteredPassword });
-console.log(user);
-    if (user) {
-      // Send success message to the client
-      io.emit("LoginStatus",JSON.stringify({ status:true,userData:user }));
-    console.log(user)
-    } else {
-      io.emit("LoginStatus",JSON.stringify({ status:false }));
+const PORT = process.env.PORT || 3002;
+
+app.use(cors());
+app.use(bodyParser.json());
+
+// Connect to MongoDB
+mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/', { useNewUrlParser: true, useUnifiedTopology: true });
+
+// Use bodyParser middleware to parse JSON
+
+io.on('connection', (socket) => {
+  console.log('A user connected');
+
+  socket.on('LoginAdmin', async (message) => {
+    try {
+      const user = await AttendenceAdmin.findOne({ mail: message.enteredMail, password: message.enteredPassword });
+      if (user) {
+        io.emit("LoginStatus", JSON.stringify({ status: true, userData: user }));
+      } else {
+        io.emit("LoginStatus", JSON.stringify({ status: false }));
+      }
+    } catch (error) {
+      console.error(error);
     }
-  
-  // Other types of requests can be handled similarly
+  });
 
-} catch (error) {
-  // Handle error
-  console.error(error);
-}
-})
+  socket.on('LoginStudent', async (message) => {
+    try {
+      const user = await StudentModel.findOne({ mail: message.enteredMail, password: message.enteredPassword });
+      if (user) {
+        io.emit("LoginStatus", JSON.stringify({ status: true, userData: user }));
+      } else {
+        io.emit("LoginStatus", JSON.stringify({ status: false }));
+      }
+    } catch (error) {
+      console.error(error);
+    }
+  });
 
-  // Handle user creation studnet data and Attendance data
   socket.on('createStudentData', async (userData) => {
     try {
       const newUser = new StudentModel(userData);
       const savedUser = await newUser.save();
-      // Create attendance entry for the user
+
       const attendanceEntry = await Attendance.findOne({ section: userData.section });
       if (attendanceEntry) {
-     attendanceEntry.attendance.push({
+        attendanceEntry.attendance.push({
           name: userData.name,
           mail: userData.mail,
         });
         await attendanceEntry.save();
-        const da=await Attendance.find({});  
-        io.emit('statusOfCreateStudentModel', {status:"done",da});
+        const da = await Attendance.find({});
+        io.emit('statusOfCreateStudentModel', { status: "done", da });
       } else {
         const newAttendanceEntry = new Attendance({
           section: userData.section,
@@ -104,51 +83,36 @@ console.log(user);
           }],
         });
         await newAttendanceEntry.save();
-        io.emit('statusOfCreateStudentModel', {status:"done",newAttendanceEntry});
+        io.emit('statusOfCreateStudentModel', { status: "done", newAttendanceEntry });
       }
 
-      // Emit a WebSocket event to notify clients about the new user
-
-
-      // Emit a WebSocket event to notify clients about the attendance update
-      io.emit('attendanceUpdate', { status:"done" });
+      io.emit('attendanceUpdate', { status: "done" });
 
     } catch (error) {
-      // Emit an error event if user creation fails
       console.log(error)
       socket.emit('createUserError', { error: error.message });
     }
   });
-   
 
-  //active map
-  socket.on('activateMap', async ({ section, lat, lng,Enable }) => {
+  socket.on('activateMap', async ({ section, lat, lng, Enable }) => {
     console.log(Enable)
     try {
-      // Find the attendance entry for the specified section
       const attendanceEntry = await Attendance.findOne({ section });
-     
+
       if (attendanceEntry) {
-        // Update mapActive for all attendance records in the specified section
         attendanceEntry.attendance.forEach((record) => {
           record.mapActive = Enable;
           record.lat = lat;
           record.lng = lng;
         });
-        console.log(attendanceEntry)
-        // Save the updated attendance entry
+
         await attendanceEntry.save();
         const attendenceData = await Attendance.findOne({ section });
-        // Emit a WebSocket event to notify clients about the map activation
         io.emit('statusOfmapActivated', attendenceData);
-  
       } else {
-        // Emit an error event if the specified section is not found
         io.emit('statusOfmapActivated', { error: `Section ${section} not found` });
       }
-  
     } catch (error) {
-      // Emit an error event if map activation fails
       console.log(error)
       socket.emit('activateMapError', { error: error.message });
     }
@@ -156,48 +120,37 @@ console.log(user);
 
   socket.on('matchTheMap', async ({ section, name, mail }) => {
     try {
-      // Find the section
       const foundSection = await Attendance.findOne({ section });
 
       if (foundSection) {
-        // Find the student within the section
         const foundStudent = foundSection.attendance.find(student => student.name === name && student.mail === mail);
 
         if (foundStudent) {
-          // Update isMapTrue for the found student
           foundStudent.isMapTrue = true;
-
-          // Save the updated section back to the database
           await foundSection.save();
           const data = await Attendance.findOne({ section });
-          io.emit('matchTheMapDone',{"status":"done",data});
+          io.emit('matchTheMapDone', { "status": "done", data });
         } else {
-          io.emit('matchTheMapDone',{"status":"not found student"});
+          io.emit('matchTheMapDone', { "status": "not found student" });
         }
       } else {
-        io.emit('matchTheMapDone',{"status":"not found section"});
+        io.emit('matchTheMapDone', { "status": "not found section" });
       }
     } catch (error) {
       io.emit(`Error: ${error.message}`);
     }
   });
-   
- 
-  // Handle frontend event to send email and generate OTP
+
   socket.on('sendEmailAndGenerateOTP', async ({ mail }) => {
     try {
-      // Generate a random 6-digit OTP
       const otp = Math.floor(100000 + Math.random() * 900000);
 
-      // Create an OTP document
       const otpDocument = new OTP({
         otp,
       });
 
-      // Save the OTP to the database
       await otpDocument.save();
 
-      // Send the OTP to the user's email
       const transporter = nodemailer.createTransport({
         service: 'gmail',
         auth: {
@@ -213,75 +166,59 @@ console.log(user);
         html: `<b>Your OTP code: ${otp}</b>`,
       });
 
-      // Send success message to the client
-      io.emit('OTPstatus',{status:true});
+      io.emit('OTPstatus', { status: true });
     } catch (error) {
-      // Send error message to the client
-      io.emit("otpError",`Error: ${error.message}`);
+      io.emit("otpError", `Error: ${error.message}`);
     }
   });
 
-
-  socket.on('verifyMailandProvideAttendence', async ({enteredNumber,enteredMail,enteredSection}) => {
+  socket.on('verifyMailandProvideAttendence', async ({ enteredNumber, enteredMail, enteredSection }) => {
     try {
-        // Check if the entered number matches the stored OTP
-        const storedOTP = await OTP.findOne({ otp: enteredNumber }); // Get the latest OTP
-        const t=await OTP.find({})
-        console.log("user",enteredNumber,enteredMail,enteredSection,OTP)
-        if (storedOTP) {
-          // Remove the used OTP from the database
-          await OTP.findOneAndDelete({ otp: enteredNumber });
-           const otpdata=await OTP.find({})
-          // Find the corresponding user in the Attendance collection
-          const user = await Attendance.findOne({
-            section: enteredSection
-          });
-   
-          if (user) {
-            // Update period1 as true for the found user
-            const student = user.attendance.find((s) => s.mail === enteredMail);
-            if (student) {
-              student.period1 = true;
-              await user.save();
+      const storedOTP = await OTP.findOne({ otp: enteredNumber });
+      const t = await OTP.find({});
 
-              // Send success message to the client
-              io.emit("verifyOTPResult",{ action: 'verifyOTPResult', success: true, message: 'Number verification successful. Period1 updated.' });
-            } else {
-              io.emit("verifyOTPResult",{ action: 'verifyOTPResult', success: false, message: 'User not found in the specified section.' });
-            }
+      if (storedOTP) {
+        await OTP.findOneAndDelete({ otp: enteredNumber });
+
+        const user = await Attendance.findOne({
+          section: enteredSection
+        });
+
+        if (user) {
+          const student = user.attendance.find((s) => s.mail === enteredMail);
+          if (student) {
+            student.period1 = true;
+            await user.save();
+            io.emit("verifyOTPResult", { action: 'verifyOTPResult', success: true, message: 'Number verification successful. Period1 updated.' });
           } else {
-            io.emit("verifyOTPResult",{ action: 'verifyOTPResult', success: false, message: 'User not found in the specified section.' });
+            io.emit("verifyOTPResult", { action: 'verifyOTPResult', success: false, message: 'User not found in the specified section.' });
           }
         } else {
-          io.emit("verifyOTPResult",{ action: 'verifyOTPResult', success: false, message: 'not done.' });
+          io.emit("verifyOTPResult", { action: 'verifyOTPResult', success: false, message: 'User not found in the specified section.' });
         }
-      
+      } else {
+        io.emit("verifyOTPResult", { action: 'verifyOTPResult', success: false, message: 'not done.' });
+      }
+
     } catch (error) {
-      // Handle error
       console.error(error);
     }
   });
-s
-  socket.on("initailStudentData",async({name,mail,section})=>{
+
+  socket.on("initailStudentData", async ({ name, mail, section }) => {
     const foundSection = await Attendance.findOne({ section });
     if (foundSection) {
-      // Find the student within the section
       const foundStudent = foundSection.attendance.find(student => student.name === name && student.mail === mail);
-            console.log(foundStudent);
-             io.emit("initailStudentResponse",foundStudent)    
-        }
-      })
-  // Handle disconnection
+      console.log(foundStudent);
+      io.emit("initailStudentResponse", foundStudent)
+    }
+  });
+
   socket.on('disconnect', () => {
     console.log('User disconnected');
   });
 });
 
-
-
-
-
-// Create a new user
 app.post('/create/admin', async (req, res) => {
   console.log(req.body)
   try {
@@ -293,12 +230,6 @@ app.post('/create/admin', async (req, res) => {
   }
 });
 
-
-
-
-server.listen(PORT,()=>{
-    console.log("server running on port",PORT);
-})
-
-
-
+server.listen(PORT, () => {
+  console.log("server running on port", PORT);
+});
