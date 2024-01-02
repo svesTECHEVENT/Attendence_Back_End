@@ -1,30 +1,34 @@
-const express=require("express")
 const nodemailer = require("nodemailer")
-const mongoose=require('mongoose')
-const bodyParser=require('body-parser')
 const AttendenceAdmin = require('./models/admin');
 const StudentModel = require('./models/student');
 const OTP=require('./models/otp')
 const Attendance=require('./models/Attendence')
+const express = require('express');
+const mongoose = require('mongoose');
+const bodyParser = require('body-parser');
+const cors = require('cors');
+const http = require('http');
 const socketIo = require('socket.io');
-const http=require('http')
-const cors=require('cors')
 
-
-var app=express()
-app.use(cors())
-let port=3000;
-
-
+const app = express();
 const server = http.createServer(app);
-const io = socketIo(server,{
-  cors:{
-   origin: "*"
-  }
-});
+const io = socketIo(server);
+
+const PORT = process.env.PORT || 3002;
+
+const options = {
+  origin: 'https://commentes.vercel.app',
+  credentials: true,
+  methods: ["GET", "POST"],
+  transports: ['websocket', 'polling']
+}
+
+app.use(cors(options));
+app.use(bodyParser.json());
 
 // Connect to MongoDB
-mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/');
+mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/',{ useNewUrlParser: true, useUnifiedTopology: true });
+
 
 // Use bodyParser middleware to parse JSON
 app.use(bodyParser.json());
@@ -292,27 +296,9 @@ app.post('/create/admin', async (req, res) => {
 
 
 
-server.listen(port,()=>{
-    console.log("server running on port",port);
+server.listen(PORT,()=>{
+    console.log("server running on port",PORT);
 })
 
 
 
-
-
-// app.get("/sendEmail",async(res,req)=>{
-//   let transporter=await nodemailer.createTransport({
-//         service:"gmail",
-//         auth:{
-//            user:"techengaging@gmail.com",
-//            pass:"elke utjw wxhn axyx"
-//              }
-//         })
-//      let info=await transporter.sendMail({
-//        from:"techengaging@gmail.com",
-//        to:"shaikimampashadeveloper@gmail.com",
-//        subject: "Attendence Otp",
-//        html:"<b>your otp code</b>"
-//      })
-//      console.log(info);
-// })
