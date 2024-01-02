@@ -17,7 +17,7 @@ const io = socketIo(server);
 const PORT = process.env.PORT || 3002;
 
 const options = {
-  origin: 'https://commentes.vercel.app',
+  origin: 'https://attendence-front-end.vercel.app',
   credentials: true,
   methods: ["GET", "POST"],
   transports: ['websocket', 'polling']
