@@ -10,7 +10,15 @@ const cors = require('cors');
 const http = require('http');
 const socketIo = require('socket.io');
 
+
+const corsOptions = {
+  origin: 'http://localhost:3002', // Update with your client's origin
+  methods: 'POST',
+  credentials: true,
+};
 const app = express();
+app.use(cors(corsOptions));
+app.use(bodyParser.json());
 const server = http.createServer(app);
 const io = socketIo(server, {
   cors: {
@@ -23,14 +31,42 @@ const io = socketIo(server, {
 
 const PORT = process.env.PORT || 3002;
 
-app.use(cors());
-app.use(bodyParser.json());
 
 // Connect to MongoDB
 mongoose.connect('mongodb+srv://travalapp:travalapp@cluster0.oz5xxmc.mongodb.net/', { useNewUrlParser: true, useUnifiedTopology: true });
 
 // Use bodyParser middleware to parse JSON
+app.post('/initailStudentData', async (req, res) => {
+  try {
+    const { name, mail, section } = req.body;
+    const foundSection = await Attendance.findOne({ section });
 
+    if (foundSection) {
+      const foundStudent = foundSection.attendance.find(student => student.name === name && student.mail === mail);
+      console.log(foundStudent);
+      res.json({ foundStudent }); // Sending response to the client
+    } else {
+      res.status(404).json({ error: 'Section not found' });
+    }
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+app.post('/create/admin', async (req, res) => {
+  console.log(req.body)
+  try {
+    const newUser = new AttendenceAdmin(req.body);
+    const savedUser = await newUser.save();
+    res.status(201).json(savedUser);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+app.get('/getStudentDestailes',async(req,res)=>{
+  const data=await Attendance.find({})
+  res.json({data})
+})
 io.on('connection', (socket) => {
   console.log('A user connected');
 
@@ -217,17 +253,6 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('User disconnected');
   });
-});
-
-app.post('/create/admin', async (req, res) => {
-  console.log(req.body)
-  try {
-    const newUser = new AttendenceAdmin(req.body);
-    const savedUser = await newUser.save();
-    res.status(201).json(savedUser);
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
 });
 
 server.listen(PORT, () => {
